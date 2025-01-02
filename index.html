@@ -35,6 +35,17 @@
         button:hover {
             background-color: #45a049;
         }
+        .image-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .image-preview img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
@@ -73,10 +84,7 @@
         <div class="form-group">
             <label for="customerType">Type of Customer</label>
             <select id="customerType" name="customerType" required>
-                <option value="">Select Type</option>
-                <option value="retail">Retail</option>
-                <option value="wholesale">Wholesale</option>
-                <!-- Add more options as needed -->
+                <option value="">Select Customer Type</option>
             </select>
         </div>
 
@@ -84,112 +92,133 @@
             <label for="category">Category</label>
             <select id="category" name="category" required>
                 <option value="">Select Category</option>
-                <option value="retail">Retail</option>
-                <option value="wholesale">Wholesale</option>
-                <!-- Add your 500+ options here -->
             </select>
         </div>
 
         <div class="form-group">
             <label for="productInterest">Product Interest</label>
-            <input type="text" id="productInterest" name="productInterest">
+            <select id="productInterest" name="productInterest" required>
+                <option value="">Select Product</option>
+            </select>
         </div>
 
         <div class="form-group">
             <label for="salesPerson">Sales Person</label>
-            <input type="text" id="salesPerson" name="salesPerson">
+            <select id="salesPerson" name="salesPerson" required>
+                <option value="">Select Sales Person</option>
+            </select>
         </div>
 
         <div class="form-group">
             <label for="review">Review</label>
-            <textarea id="review" name="review" rows="4"></textarea>
+            <select id="review" name="review" required>
+                <option value="">Select Review</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="images">Upload Images</label>
+            <input type="file" id="images" name="images" multiple accept="image/*">
+            <div id="imagePreview" class="image-preview"></div>
         </div>
 
         <button type="submit">Submit</button>
     </form>
 
     <script>
-        let locationData = {};
-        
-        // Fetch location data from Google Apps Script
-        fetch('https://script.google.com/macros/s/AKfycbx0VBEyfQBE5hI5FiCHU_GvVarvslhIKH4LrGDR7iUPnnWwZWDtW6QitYwZAGzsZU-R/exec')
-          .then(response => response.json())
-          .then(data => {
-            locationData = data;
-            // Populate state dropdown
-            const stateSelect = document.getElementById('state');
-            Object.keys(locationData).forEach(state => {
-                const option = new Option(state, state);
-                stateSelect.add(option);
-            });
-          });
+        let formData = {};
 
-        // Populate state dropdown
-        const stateSelect = document.getElementById('state');
-        Object.keys(locationData).forEach(state => {
-            const option = new Option(state, state);
-            stateSelect.add(option);
-        });
+        // Fetch data from Google Apps Script
+        fetch('https://script.google.com/macros/s/AKfycbx7Il6Po3FzH2bCfW5su-TRba9iCzwmFyzJYB-Foz_hXcSswyhFXishtcgGvkzc1rxN/exec')
+            .then(response => response.json())
+            .then(data => {
+                formData = data;
+
+                // Populate dropdowns dynamically
+                populateDropdown('state', Object.keys(formData.locations));
+                populateDropdown('customerType', formData.customerTypes);
+                populateDropdown('category', formData.categories);
+                populateDropdown('productInterest', formData.products);
+                populateDropdown('salesPerson', formData.salesPersons);
+                populateDropdown('review', formData.reviews);
+            });
+
+        function populateDropdown(id, items) {
+            const select = document.getElementById(id);
+            items.forEach(item => {
+                const option = new Option(item, item);
+                select.add(option);
+            });
+        }
 
         // Update districts when state changes
-        stateSelect.addEventListener('change', function() {
-            const districtSelect = document.getElementById('district');
-            const tehsilSelect = document.getElementById('tehsil');
-            
-            // Clear existing options
-            districtSelect.innerHTML = '<option value="">Select District</option>';
-            tehsilSelect.innerHTML = '<option value="">Select Tehsil</option>';
-            
-            if (this.value) {
-                const districts = Object.keys(locationData[this.value]);
-                districts.forEach(district => {
-                    const option = new Option(district, district);
-                    districtSelect.add(option);
-                });
-            }
+        document.getElementById('state').addEventListener('change', function () {
+            const districts = Object.keys(formData.locations[this.value] || {});
+            populateDropdown('district', districts);
+            document.getElementById('tehsil').innerHTML = '<option value="">Select Tehsil</option>';
         });
 
         // Update tehsils when district changes
-        document.getElementById('district').addEventListener('change', function() {
-            const tehsilSelect = document.getElementById('tehsil');
-            const selectedState = document.getElementById('state').value;
-            
-            // Clear existing options
-            tehsilSelect.innerHTML = '<option value="">Select Tehsil</option>';
-            
-            if (this.value) {
-                const tehsils = locationData[selectedState][this.value];
-                tehsils.forEach(tehsil => {
-                    const option = new Option(tehsil, tehsil);
-                    tehsilSelect.add(option);
-                });
-            }
+        document.getElementById('district').addEventListener('change', function () {
+            const state = document.getElementById('state').value;
+            const tehsils = formData.locations[state]?.[this.value] || [];
+            populateDropdown('tehsil', tehsils);
+        });
+
+        // Preview uploaded images
+        document.getElementById('images').addEventListener('change', function (e) {
+            const preview = document.getElementById('imagePreview');
+            preview.innerHTML = '';
+            [...e.target.files].forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    preview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
         });
 
         // Form submission handler
-        document.getElementById('partyForm').addEventListener('submit', async function(e) {
+        document.getElementById('partyForm').addEventListener('submit', async function (e) {
             e.preventDefault();
-            
+
             const formData = new FormData(this);
             const formObject = {};
+
             formData.forEach((value, key) => {
-                formObject[key] = value;
+                if (key === 'images') {
+                    formObject.images = [...formData.getAll('images')].map(file => {
+                        return new Promise(resolve => {
+                            const reader = new FileReader();
+                            reader.onload = e => resolve(e.target.result);
+                            reader.readAsDataURL(file);
+                        });
+                    });
+                } else {
+                    formObject[key] = value;
+                }
             });
-            
+
+            formObject.images = await Promise.all(formObject.images || []);
+
             try {
-                const response = await fetch('https://script.google.com/macros/s/AKfycbx0VBEyfQBE5hI5FiCHU_GvVarvslhIKH4LrGDR7iUPnnWwZWDtW6QitYwZAGzsZU-R/exec', {
+                await fetch('https://script.google.com/macros/s/AKfycbx7Il6Po3FzH2bCfW5su-TRba9iCzwmFyzJYB-Foz_hXcSswyhFXishtcgGvkzc1rxN/exec', {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(formObject)
+                    body: JSON.stringify(formObject),
                 });
-                
+
                 alert('Data submitted successfully!');
                 this.reset();
+                document.getElementById('imagePreview').innerHTML = '';
             } catch (error) {
-                alert('Error submitting data: ' + error.message);
+                alert('Error submitting data.');
+                console.error(error);
             }
         });
     </script>
